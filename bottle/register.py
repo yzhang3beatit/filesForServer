@@ -1,4 +1,9 @@
-from bottle import route, run, static_file, request, response, template
+# -*- coding: utf-8 -*-
+
+
+from bottle import route, get, run, static_file, request, response, template, HTTPResponse
+import time
+import hashlib
 
 @route('/')
 def home():
@@ -9,11 +14,30 @@ def echo(thing):
     return "Say hello to my little friend: %s!" % thing
 
 # url /register?id=1&page=5
-@route('/register')
+@route('/weixin')
 def register():
-    register_id = request.query.id
-    page = request.query.page or '1'
-    return template('Register ID: {{id}} (page {{page}})', id=register_id, page=page)
+    signature = request.query.signature
+    timestamp = request.query.timestamp
+    nonce = request.query.nonce
+    echostr = request.query.echostr
+    token = "zhangyang2"
+    print(signature, timestamp, nonce, echostr)
+    lists = [token, timestamp, nonce]
+    lists.sort()
+    data = ""
+    for s in lists:
+        data += s
+
+    sha1 = hashlib.sha1()
+    sha1.update(data.encode("utf8"))
+#    map(sha1.update, lists)
+    hashcode = sha1.hexdigest()
+    print(hashcode)
+    
+    if hashcode == signature:
+        return HTTPResponse(echostr)
+
+#    return template('Register ID: {{id}} (page {{page}})', id=signature, page=nonce)
 
 #    return ''' <form method = "POST">
 #                 <input name="name" type="text"/>
@@ -21,4 +45,8 @@ def register():
 #                 <input type="submit" value="Login"/>
 #                 </form>'''
 
-run(host="localhost", port=80)
+@get('/')
+def index():
+    print(request.GET.get('echostr'))
+    return request.GET.get('echostr')
+run(host="172.19.0.1", port=80)
