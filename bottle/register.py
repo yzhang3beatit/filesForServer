@@ -45,8 +45,4 @@ def register():
 #                 <input type="submit" value="Login"/>
 #                 </form>'''
 
-@get('/')
-def index():
-    print(request.GET.get('echostr'))
-    return request.GET.get('echostr')
-run(host="172.19.0.1", port=80)
+run(host="172.19.0.2", port=80)

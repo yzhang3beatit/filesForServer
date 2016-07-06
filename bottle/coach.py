@@ -7,106 +7,62 @@ try:
     import xlrd
     import xlwt
 except:
-    print '3rd party package needed: xlrd xlwt'
+    print('3rd party package needed: xlrd xlwt')
 import time
 import datetime
 import os
+import xml.etree.ElementTree as ET
 
+def sec2str(secs):
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(secs))
+
+def parse_xml(msgstr):
+    root = ET.fromstring(msgstr)
+    print(msgstr)
+    msg = {}
+    for child in root:
+        if child.tag == 'CreateTime':
+            msg[child.tag] = sec2str(int(child.text))
+        else:
+            msg[child.tag] = child.text
+
+    msg['name'] = ''
+    msg['nokiaid'] = 0
+    msg['mdep'] = ''
+    return msg
+
+def split_xml(xmls):
+    start = 0
+    end = 0
+    ret = []
+    start = xmls.find('<xml>')
+    while end != -1:
+        end = xmls.find('<xml>', start + 1)
+        if end == -1:
+            break
+        ret.append(xmls[start:end])
+        start = end if end != -1 else start
+    
+    ret.append(xmls[start:])
+    return ret
 
 def fetch_messages_with_keyword(messages):
     i = 0
     users = []
-    start = messages.find('<ul id="listContainer"')
-    messages = messages[start+len('<ul id="listContainer"'):]
-    while start != -1:
-#        print messages
-        start = messages.find('<li data-id')
-        end = messages.find('</li>')
-        if start == -1:
-            break
-        user = fetch_msg_from_message(messages[start:end])
+    for message in split_xml(messages):
+        user = fetch_msg_from_message(message)
         users.append(user)
-        start = messages.find('<li data-id')
-        i = i + 1
-        messages = messages[end+len('</li>'):]
-    print 'total:', i
     print_list(users)
     return users
 
 def fetch_msg_from_message(message):
-    fakeid = fetch_fakeid_from_msg(message)
-    fakeid = 'ID'+fakeid
-    name = fetch_remark_name_from_msg(message)
-    date = fetch_date_from_msg(message)
-    sign = fetch_sign_from_msg(message)
-    nsnid = fetch_nsnid_from(sign)
-    dep = fetch_department_from(sign)
-
-    user = {'ID':fakeid, 'Memo': sign, 'Name':name, 'NSN ID':nsnid, 'Department':dep,
-            'TimeStamp':date, 'Sign':name}
-    print user
+    print(type(message), message)
+    msg = parse_xml(message)
+    user = {'ID':msg['FromUserName'], 'Memo': msg['Content'], 'Name':msg['name'], 
+           'Nokia ID':msg['nokiaid'], 'Department':msg['mdep'],
+           'TimeStamp':msg['CreateTime'], 'Sign':msg['Content']}
     return user
 
-def fetch_nsnid_from(sign):
-    nsnid = sign.split(';')
-    if len(nsnid) > 1 and nsnid[1].isdigit():
-        return nsnid[1]
-    else:
-        return '0'
-
-
-def fetch_department_from(sign):
-    nsnid = sign.split(';')
-    if len(nsnid) > 2 and nsnid[2].lower().startswith('d'):
-        return nsnid[2].upper()
-    else:
-        return ''
-
-
-def fetch_sign_from_msg(message):
-    sign = fetch_label_from_msg(message, 'class="wxMsg "').strip()
-    for i in [',', '.', ':', u'：', u'。', u'，', u'；']:
-        sign = sign.replace(i, ';')
-    return sign
-
-
-
-def fetch_remark_name_from_msg(message):
-    return fetch_label_from_msg(message, 'class="remark_name"')
-
-def fetch_label_from_msg(msg, key):
-    start = msg.find(key)
-    msg = msg[start:]
-
-    start = msg.find('>')
-    msg = msg[start+1:]
-    end = msg.find('<')
-
-    return msg[:end]
-
-
-def fetch_date_from_msg(message):
-    date = fetch_label_from_msg(message, 'class="message_time"')
-#    date = message
-    today = datetime.date.today()
-    yesterday = today - datetime.timedelta(days=1)
-    if len(date) > 7:
-        start = date.find(' ')
-        date = yesterday.strftime('%Y-%m-%d') + date[start:]
-    else:
-        date = today.strftime('%Y-%m-%d ') + date
-    return date
-#    return getdate(date_time)
-
-def fetch_fakeid_from_msg(message):
-    start = message.find('data-tofakeid')
-    return fetch_data_from_msg(message[start:])
-
-def fetch_data_from_msg(message):
-    start = message.find('"')
-    end = message[start+1:].find('"')
-    end = end + start + 2
-    return message[start+1:end-1]
 
 def record_messages_with_keyword(filenam, messages, keyword):
     row_list = get_records_from_xls(filenam, 'Clear')
@@ -115,12 +71,10 @@ def record_messages_with_keyword(filenam, messages, keyword):
 
     if messages:
         msgs = fetch_messages_with_keyword(messages)
-#        msgs = get_messages_from(messages, keyword)
     else:
         msgs = []
 
     combine_record_with_history(newname, keyword, len(row_list), Columns['Max'], msgs, row_list)
-#    print row_list
 
 
 Columns = {}
@@ -129,7 +83,7 @@ Columns['Memo'] = 1
 Columns['TimeStamp'] = 2
 Columns['Department'] = 3
 Columns['Name'] = 4
-Columns['NSN ID'] = 5
+Columns['Nokia ID'] = 5
 Columns['Sign'] = 6
 Columns['Max'] = 7
 
@@ -138,23 +92,24 @@ def combine_record_with_history(newname, keyword, nrows, ncols, messages, alist)
     row_list = []
     msgs = []
     found = 'N'
+    print('alist', alist)
     for li in alist:
         hist_id = li[Columns['ID']]
         if li[Columns['TimeStamp']] != 'TimeStamp':
             li[Columns['TimeStamp']] = ''
         for msg in messages:
             WeChat_id = msg['ID']
-            if (WeChat_id == hist_id) or (li[Columns['NSN ID']] == int(msg['NSN ID'])):
-                print 'found', msg['Name'], WeChat_id, 
-                print hist_id, li[Columns['NSN ID']], int(msg['NSN ID'])
+            if (WeChat_id == hist_id) or (li[Columns['Nokia ID']] == int(msg['Nokia ID'])):
+                print('found', msg['Name'], WeChat_id,) 
+                print(hist_id, li[Columns['Nokia ID']], int(msg['Nokia ID']))
                 li[Columns['ID']] = msg['ID']
                 li[Columns['Memo']] = msg['Memo']
                 li[Columns['TimeStamp']] = msg['TimeStamp']
                 if msg['Department']:
                     li[Columns['Department']] = msg['Department']
                 li[Columns['Name']] = msg['Name']
-                if msg['NSN ID'] != '0':
-                    li[Columns['NSN ID']] = msg['NSN ID']
+                if msg['Nokia ID'] != '0':
+                    li[Columns['Nokia ID']] = msg['Nokia ID']
                 li[Columns['Sign']] = msg['Sign']
         row_list.append(li)
 
@@ -168,16 +123,18 @@ def combine_record_with_history(newname, keyword, nrows, ncols, messages, alist)
         if found == 'Y':
             found = 'N'
         else:
-            print 'not found:', msg
+            print('not found:', msg)
             msgs = combine_record_in(msgs, msg)
 
 
+    print('msgs_list:', msgs)
+    print('row_list:', row_list)
     write_to_excel(newname, keyword, nrows, ncols, msgs, row_list)
 
 def combine_record_in(msgs, record):
 #    found = 'N'
 #   for msg in msgs:
-#        if (msg['ID'] == record['ID']) or (int(msg['NSN ID']) == int(record['NSN ID'])):
+#        if (msg['ID'] == record['ID']) or (int(msg['Nokia ID']) == int(record['nokia ID'])):
 #            found = 'Y'
 #    if found == 'N':
     msgs.append(record)
@@ -200,12 +157,13 @@ def write_to_excel(filename, sheetname, nrows, ncols, content, row_list):
 
 def write_message_to_rows(sheet, msgs, row):
     if row == 0:
-        for type in ['ID', 'Memo', 'TimeStamp', 'Department', 'Name', 'NSN ID', 'Sign']:
+        for type in ['ID', 'Memo', 'TimeStamp', 'Department', 'Name', 'Nokia ID', 'Sign']:
             write_to_cell(sheet, 0, Columns[type], type)
         row = row + 1
 
 
     for msg in msgs:
+        print('write to sheet', row, msg)
         write_message_to_row(sheet, msg, row)
         row = row + 1
 
@@ -214,11 +172,7 @@ def write_message_to_row(sheet, msg, row):
         write_to_cell(sheet, row, Columns[key], msg[key])
 
 def write_to_cell(sheet, row, col, value):
-#    ezxf = xlwt.easyxf
-#    if type(value) == type('') and not value.isdigit():
     sheet.write(row, col, value)
-#    else:
-#        sheet.write(row, col, int(value), ezxf(num_format_str='#######0'))
     print row, col, value
 
 
@@ -232,7 +186,7 @@ def get_cur_time():
 
 def print_list(list):
     for li in list:
-        print li
+        print(li)
 
 def open_html():
     fp = open('./html.txt', 'r')
@@ -248,9 +202,7 @@ def get_messages_from(html, keyword):
     for line in lines:
         line = line.strip()
         if line.startswith('list'):
-            print 'line:', len(line)
             ids = get_ids_from(line)
-            print 'ids:', ids
             ids = clear_ids(ids, keyword)
             messages = get_msgs_from(ids, keyword)
             print_list(messages)
@@ -260,7 +212,6 @@ def get_messages_from(html, keyword):
 def get_ids_from(line):
     line = line.decode('utf-8')
     lines = line.split('{')
-    print 'ids_line:'
     print_list(lines)
     ids = []
     for li in lines:
@@ -295,23 +246,21 @@ def get_msgs_from(ids, keyword):
     msgs = []
     for id in ids:
         key = get_keyword_from(id)
-        print key, keyword
         if key_matched(key, keyword):
             continue
         cont = get_content_from(id)
         name = get_name_from(id)
-        nsnid = get_nsnid_from(id)
+        Nokiaid = get_nokiaid_from(id)
         dep = get_department_from(id)
         date = get_date_time_from(id)
         wxid = 'ID'+get_weixingid_from(id)
-        print wxid
-        msg = {'ID':wxid, 'Memo': cont, 'Name':name, 'NSN ID':nsnid, 'Department':dep,
+        msg = {'ID':wxid, 'Memo': cont, 'Name':name, 'Nokia ID':nokiaid, 'Department':dep,
                'TimeStamp':date, 'Sign':name}
         msgs.append(msg)
     return msgs
 
 def get_weixingid_from(id):
-    start = id.find('fakeid')
+    start = id.find('openid')
     end = id.find(',"nick_name')
     wxid = id[start:end]
     start = wxid.find(':"')
@@ -334,20 +283,20 @@ def get_keyword_from(id):
         return ''
 
 
-def get_nsnid_from(id):
+def get_Nokiaid_from(id):
     cont = get_content_from(id)
-    nsnid = cont.split(';')
-    if len(nsnid) > 1 and nsnid[1].isdigit():
-        return nsnid[1]
+    Nokiaid = cont.split(';')
+    if len(Nokiaid) > 1 and nokiaid[1].isdigit():
+        return Nokiaid[1]
     else:
         return '0'
 
 
 def get_department_from(id):
     cont = get_content_from(id)
-    nsnid = cont.split(';')
-    if len(nsnid) > 2 and nsnid[2].lower().startswith('d'):
-        return nsnid[2].upper()
+    Nokiaid = cont.split(';')
+    if len(Nokiaid) > 2 and nokiaid[2].lower().startswith('d'):
+        return Nokiaid[2].upper()
     else:
         return ''
 
@@ -379,7 +328,7 @@ def get_list_from_sheet(sheet, filter=''):
     row_list = []
     for row in range(nrows):
         data = sheet.row_values(row)
-        if row != 0 and filter == 'Clear':
+        if data[0] != 'OpenID' and filter == 'Clear':
             data[len(data) - 1] = ''
             data[Columns['Memo']] = ''
         if filter == 'Signed' and data[len(data) - 1] == '':
@@ -400,12 +349,15 @@ def get_records_from_xls(fromf, flag=''):
             sh = bk.sheet_by_name(shnames[0])
             nrows = sh.nrows
             ncols = sh.ncols
+            row_list = get_list_from_sheet(sh, flag)
         else:
-            print 'no sheet in %s' % (fromf)
-    except:
-        print 'no file %s' % fromf
-    print "nrows %d, \tncols %d: \t%s" % (nrows, ncols, fromf)
-    row_list = get_list_from_sheet(sh, flag)
+            print('no sheet in %s' % (fromf))
+    except Exception as e:
+        print('no file %s' % fromf)
+        row_list = [['Weixing signature',' ',' ',' ',' ',' ',' '],['OpenID', 'Memo', 'TimeStamp', 'Department', 'Name',
+        'Nokia ID', ' ']]
+        write_to_sheet(fromf, 'default', row_list)
+    print("row: %d, \tcolume: %d in %s" % (nrows, ncols, fromf))
 
     return row_list
 
@@ -441,7 +393,6 @@ def combine_records_in_xls(row_list, sum_list):
                 continue
             if matched_row(sum, row):
                 found = 'Y'
-                print 'Found:', row[Columns['Sign']]
                 if sum[Columns['Name']] == '':
                     sum[Columns['Name']] = row[Columns['Name']]
                 sum.append(row[Columns['Sign']])
@@ -450,9 +401,9 @@ def combine_records_in_xls(row_list, sum_list):
             found = 'N'
         else:
             new_list = add_record_in_xls(new_list, row)
-    print 'new sign adding in list:'
+    print('new sign adding in list:')
     print_list(new_list)
-    print 'end'
+    print('end')
     new_list = add_unmatched_record(new_list, sum_list)
 #        new_list.append(sum)
     return new_list
@@ -461,12 +412,12 @@ def matched_row(sum, sign):
     is_match = False
     if sum[Columns['Name']] != '' and sign[Columns['Name']] != '':
         is_match = (sum[Columns['Name']] == sign[Columns['Name']])
-#    elif sum[Columns['NSN ID']] != '0' and sign[Columns['NSN ID']] != 'NSN ID':
-#        is_match = (int(sum[Columns['NSN ID']]) == int(sign[Columns['NSN ID']]))
+#    elif sum[Columns['Nokia ID']] != '0' and sign[Columns['nokia ID']] != 'NSN ID':
+#        is_match = (int(sum[Columns['Nokia ID']]) == int(sign[Columns['nokia ID']]))
     return is_match
 
 def add_record_in_xls(new_list, row):
-    print 'Adding new in sum record:'
+    print('Adding new in sum record:')
     print_list(row)
     new_list.append(row)
     new_list = align_last_sign(new_list)
@@ -508,7 +459,7 @@ def write_to_sheet(filename, sheetname, row_list):
         for coli in range(len(row_list[rowi])):
             sheet.write(rowi, coli, row_list[rowi][coli])
     wbk.save(filename)
-    print 'write to %s' % filename
+    print('write to %s' % filename)
 
 
 if __name__ == "__main__":
@@ -516,24 +467,22 @@ if __name__ == "__main__":
     fromfile = './sign_record.xls'
     tofile = './VSP_sign_records.xls'
     date = '10:10'
-    msg = '<li data-id="206045409" id="msgListItem206045409" class="message_item replyed"> <div class="message_opr"> <a title="收藏消息" starred="" idx="206045409" action="search" class="js_star icon18_common star_gray" href="javascript:;">取消收藏</a> <a title="快捷回复" class="icon18_common reply_gray js_reply" data-tofakeid="30094145" data-id="206045409" href="javascript:;">快捷回复</a> </div> <div class="message_info"> <div class="message_status"><em class="tips">已回复</em></div> <div class="message_time">09:29</div> <div class="user_info"> <a class="remark_name" data-id="206045409" data-fakeid="30094145" target="_blank" href="/cgi-bin/singlesendpage?tofakeid=30094145&amp;t=message/send&amp;action=index&amp;token=1381246310&amp;lang=zh_CN">Wu Tianle</a> <span data-id="206045409" data-fakeid="30094145" class="nickname">(<strong>5天_IT.Will</strong>)</span> <a style="display:none;" title="修改备注" data-fakeid="30094145" class="icon14_common edit_gray js_changeRemark" href="javascript:;"></a> <a data-id="206045409" data-fakeid="30094145" class="avatar" href="/cgi-bin/singlesendpage?tofakeid=30094145&amp;t=message/send&amp;action=index&amp;token=1381246310&amp;lang=zh_CN" target="_blank"> <img data-fakeid="30094145" src="/misc/getheadimg?token=1381246310&amp;fakeid=30094145&amp;msgid=206045409" /> </a> </div> </div> <div class="message_content text"> <div class="wxMsg" data-id="206045409" id="wxMsg206045409">KISSvTAS</div> </div> <div class="js_quick_reply_box quick_reply_box" id="quickReplyBox206045409"> <label class="frm_label" for="">快速回复:</label> <div class="emoion_editor_wrp js_editor"></div> <div class="verifyCode"></div> <p class="quick_reply_box_tool_bar"> <span data-id="206045409" class="btn btn_primary btn_input"> <button data-fakeid="30094145" data-id="206045409" class="js_reply_OK">发送</button> </span><a href="javascript:;" data-id="206045409" class="js_reply_pickup btn btn_default pickup">收起</a> </p> </div>'
-    lines = '''
-     <li data-id="206045409" id="msgListItem206045409" class="message_item replyed"> <div class="message_opr"> <a title="收藏消息" starred="" idx="206045409" action="search" class="js_star icon18_common star_gray" href="javascript:;">取消收藏</a> <a title="快捷回复" class="icon18_common reply_gray js_reply" data-tofakeid="30094145" data-id="206045409" href="javascript:;">快捷回复</a> </div> <div class="message_info"> <div class="message_status"><em class="tips">已回复</em></div> <div class="message_time">09:29</div> <div class="user_info"> <a class="remark_name" data-id="206045409" data-fakeid="30094145" target="_blank" href="/cgi-bin/singlesendpage?tofakeid=30094145&amp;t=message/send&amp;action=index&amp;token=1381246310&amp;lang=zh_CN">Wu Tianle</a> <span data-id="206045409" data-fakeid="30094145" class="nickname">(<strong>5天_IT.Will</strong>)</span> <a style="display:none;" title="修改备注" data-fakeid="30094145" class="icon14_common edit_gray js_changeRemark" href="javascript:;"></a> <a data-id="206045409" data-fakeid="30094145" class="avatar" href="/cgi-bin/singlesendpage?tofakeid=30094145&amp;t=message/send&amp;action=index&amp;token=1381246310&amp;lang=zh_CN" target="_blank"> <img data-fakeid="30094145" src="/misc/getheadimg?token=1381246310&amp;fakeid=30094145&amp;msgid=206045409" /> </a> </div> </div> <div class="message_content text"> <div class="wxMsg" data-id="206045409" id="wxMsg206045409">KISSvTAS</div> </div> <div class="js_quick_reply_box quick_reply_box" id="quickReplyBox206045409"> <label class="frm_label" for="">快速回复:</label> <div class="emoion_editor_wrp js_editor"></div> <div class="verifyCode"></div> <p class="quick_reply_box_tool_bar"> <span data-id="206045409" class="btn btn_primary btn_input"> <button data-fakeid="30094145" data-id="206045409" class="js_reply_OK">发送</button> </span><a href="javascript:;" data-id="206045409" class="js_reply_pickup btn btn_default pickup">收起</a> </p> </div>
-        '''
-    pri_id = '"id":205824480,"type":1,"fakeid":"1000580904","nick_name":"薇","date_time":1425549654,"content":"TAS：61328015：D7：Huang Weiwei","source":"","msg_status":4,"remark_name":"Huang Weiwei","has_reply":1,"refuse_reason":"","multi_item":[],"to_uin":3082392893,"send_stat":{"total":0,"succ":0,"fail":0}}'
-    messages = '''
-
-    '''
     
-    combine_sign_xls(tofile, fromfile)
+#    combine_sign_xls(tofile, fromfile)
 #    print get_content_from(pri_id)
 #    fetch_messages_with_keyword(messages)
 #    fetch_msg_from_message(msg)
-#    print fetch_nsnid_from( u'KISSvTAS;69003924;D2;YiXiaoLong')
-#    fetch_fakeid_from_msg(msg)
+#    print fetch_Nokiaid_from( u'KISSvTAS;69003924;D2;YiXiaoLong')
+#    fetch_openid_from_msg(msg)
 #    fetch_remark_name_from_msg(msg)
 #    print fetch_date_from_msg(date)
 #    fetch_sign_from_msg(msg)
 #    get_messages_from(lines, 'KISSvTAS')
-#    record_messages_with_keyword(filename, lines, 'KISS_LAN')
+    with open('/home/y184zhan/tmp/msg_file.txt', 'br') as f:
+        lines = f.read()
+#    print_list(lines)
+    line = lines
+    print(type(line))
+    print(line)
+    record_messages_with_keyword(filename, line.decode(), 'KISS_LAN')
 
