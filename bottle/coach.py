@@ -51,12 +51,34 @@ def fetch_messages_with_keyword(messages):
     users = []
     for message in split_xml(messages):
         user = fetch_msg_from_message(message)
-        users.append(user)
+        if same_id_exists(user, users):
+            users = merge_user_msg(user, users)
+        else:
+            users.append(user)
     print_list(users)
     return users
 
+def same_id_exists(user, user_list):
+    for usr in user_list:
+        if usr['ID'] == user['ID']:
+            return True
+    return False
+
+def merge_user_msg(user, user_list):
+    for i, usr in enumerate(user_list):
+        if usr['ID'] == user['ID']:
+            user_list[i]['Memo'] = user['Memo']
+            user_list[i]['TimeStamp'] = user['TimeStamp']
+            user_list[i]['Sign'] = user['Name']
+
+            user_list[i]['Nokia ID'] = user['Nokia ID'] if user['Nokia ID'] else user_list[i]['Nokia ID']
+            user_list[i]['Department'] = user['Department'] if user['Department'] else user_list[i]['Department']
+            user_list[i]['Name'] = user['Name'] if user['Name'] else user_list[i]['Name']
+            break
+    return user_list
+
+
 def fetch_msg_from_message(message):
-    print(type(message), message)
     msg = parse_xml(message)
     user = {'ID':msg['FromUserName'], 'Memo': msg['Content'], 'Name':msg['name'], 
            'Nokia ID':msg['nokiaid'], 'Department':msg['mdep'],
@@ -173,7 +195,6 @@ def write_message_to_row(sheet, msg, row):
 
 def write_to_cell(sheet, row, col, value):
     sheet.write(row, col, value)
-    print row, col, value
 
 
 def get_cur_time():
