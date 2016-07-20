@@ -77,8 +77,21 @@ def build_echostr(msg):
     content = msg['Content'].strip()
     welcome =  u"Welcome to Coach Workroom"
 
-    if content == "save":
+    if content == "print" and msg['FromUserName'] == "oPZW5t7_QdCpwjFK092Bn-iywx6s":
+        welcome = u"Yes, Sir !\n"
+        data_list = [x[4] for x in DATA]
+        len_ = len(data_list) - 2
+        names = ',\n'.join(data_list)
+        welcome += str(len_) + '\n'
+        welcome += names
+
+    elif content == "save" and msg['FromUserName'] == "oPZW5t7_QdCpwjFK092Bn-iywx6s":
+        welcome = u"Yes, Sir !"
         write_to_excel('result.xls', 'SIGN', len(DATA), 7, None, DATA)
+
+    elif content.lower() == 'update':
+        welcome = u"Please sign up your ID and Name"
+        update_data_clear(msg['FromUserName'])
 
     elif '1python' in content:
         name = update_data_sign(msg['FromUserName'], content, msg['CreateTime'])
@@ -107,6 +120,12 @@ def build_echostr(msg):
 
 def is_name(str_):
     return str_.isalpha() and str_[0].isupper()
+
+def update_data_clear(openid):
+    index = bisect_left(DATA_INDEX, openid)
+    if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
+        DATA[index][4] = ''
+        DATA[index][5] = ''
 
 def update_data_find(openid):
     index = bisect_left(DATA_INDEX, openid)
