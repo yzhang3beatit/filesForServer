@@ -82,13 +82,14 @@ def read_data_file():
     return datalist
 
 def build_echostr(msg):
-    content = msg['Content']
+    content = msg['Content'].strip()
     welcome =  u"Welcome to Coach Workroom"
+
     if content == "save":
         write_to_excel('result.xls', 'SIGN', len(DATA), 7, None, DATA)
 
     elif '1python' in content:
-        name = update_data_sign(msg['FromUserName'], content)
+        name = update_data_sign(msg['FromUserName'], content, msg['CreateTime'])
         welcome = u"Welcome to sign-in: %s" %name
 
     elif content.isdigit() and len(content) == 8:
@@ -100,7 +101,11 @@ def build_echostr(msg):
         update_data_name(msg['FromUserName'], content)
 
     else:
-        welcome = u"Please type in your Nokia ID:"
+        name = update_data_find(msg['FromUserName'])
+        if name:
+            welcome = u"%s, please type in keywork to signin" % name
+        else:
+            welcome = u"Please sign up with your NokiaID or name(e.g. ZhangYang)"
 
     echostr = textTpl % (msg['FromUserName'], msg['ToUserName'], str(int(time())),
             welcome)
@@ -110,7 +115,15 @@ def build_echostr(msg):
 def is_name(str_):
     return str_.isalpha() and str_[0].isupper()
 
-def update_data_sign(openid, meno):
+def update_data_find(openid):
+    global DATA
+    for i, data_ in enumerate(DATA):
+        if data_[0] == openid:
+            return DATA[i][4]
+    return
+
+
+def update_data_sign(openid, meno, timestamp):
     found = False
     global DATA
     print('DATA:', DATA)
@@ -119,6 +132,9 @@ def update_data_sign(openid, meno):
         if data_[0] == openid:
             found = True
             print('found openid for ', meno)
+            DATA[i][1] = meno
+            DATA[i][2] = timestamp
+
             return DATA[i][4]
     if not found:
         new = [openid, meno, '', '', '', '', '']
