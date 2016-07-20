@@ -42,7 +42,13 @@ def update_access_token():
 def runs():
     start_time = time.time()
     token = update_access_token()
+    print2file(token)
     run_time = cal_time_period(start_time)
+
+def print2file(text):
+    with open('./access_token.txt', 'wb') as f:
+        f.write(text.encode('utf-8'))
+
 
 @route('/', method='POST')
 def msg_post():

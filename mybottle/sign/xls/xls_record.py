@@ -182,7 +182,8 @@ def write_message_to_rows(sheet, msgs, row):
         for type in ['ID', 'Memo', 'TimeStamp', 'Department', 'Name', 'Nokia ID', 'Sign']:
             write_to_cell(sheet, 0, Columns[type], type)
         row = row + 1
-
+    if not msgs:
+        return
 
     for msg in msgs:
         print('write to sheet', row, msg)
