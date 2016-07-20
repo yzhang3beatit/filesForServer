@@ -63,6 +63,7 @@ def main():
     global DATA
     DATA = read_data_file()
     print(DATA)
+    '''
     msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"61340148"}
     print(build_echostr(msg))
     print(DATA)
@@ -72,7 +73,7 @@ def main():
     msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"save"}
     print(build_echostr(msg))
     print(DATA)
-
+    '''
 
 def read_data_file():
     filename = './sign_record.xls'
@@ -84,7 +85,11 @@ def build_echostr(msg):
     content = msg['Content']
     welcome =  u"Welcome to Coach Workroom"
     if content == "save":
-        write_to_excel('result.xls', 'Keyword', len(DATA), 7, None, DATA)
+        write_to_excel('result.xls', 'SIGN', len(DATA), 7, None, DATA)
+
+    elif '1python' in content:
+        name = update_data_sign(msg['FromUserName'], content)
+        welcome = u"Welcome to sign-in: %s" %name
 
     elif content.isdigit() and len(content) == 8:
         welcome = u"Please type in your name:"
@@ -94,13 +99,31 @@ def build_echostr(msg):
         welcome = u"Welcome to sign-up"
         update_data_name(msg['FromUserName'], content)
 
+    else:
+        welcome = u"Please type in your Nokia ID:"
+
     echostr = textTpl % (msg['FromUserName'], msg['ToUserName'], str(int(time())),
             welcome)
 
     return echostr
 
 def is_name(str_):
-    return str_.isalpha()
+    return str_.isalpha() and str_[0].isupper()
+
+def update_data_sign(openid, meno):
+    found = False
+    global DATA
+    print('DATA:', DATA)
+    for i, data_ in enumerate(DATA):
+        print('data_: ', data_)
+        if data_[0] == openid:
+            found = True
+            print('found openid for ', meno)
+            return DATA[i][4]
+    if not found:
+        new = [openid, meno, '', '', '', '', '']
+        DATA.append(new)
+    return
 
 def update_data_name(openid, name):
     found = False
@@ -140,5 +163,5 @@ def update_data_nokiaid(openid, nokiaid):
 '''
 if __name__ == "__main__":
     main()
-#run(host='0.0.0.0', port=80)
+    run(host='0.0.0.0', port=80)
 
