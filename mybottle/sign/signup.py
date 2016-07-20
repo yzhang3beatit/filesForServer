@@ -2,6 +2,7 @@ from bottle import route, run, request
 import xml.etree.ElementTree as ET
 from time import strftime, localtime, time, clock
 
+from bisect import bisect_left
 from xls.xls_record import get_records_from_xls, write_to_excel
 
 mem_dir = '/home/y184zhan/tmp/'
@@ -59,10 +60,13 @@ def index():
     return echostr
 
 DATA = []
+DATA_INDEX = []
 def main():
     global DATA
+    global DATA_INDEX
     DATA = read_data_file()
-    print(DATA)
+    DATA_INDEX = [x[0] for x in DATA]
+#    print(bisect_left(index_table, 'oPZW8t7_QdCpwjFK092Bn-iywx6s'))
     '''
     msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"61340148"}
     print(build_echostr(msg))
@@ -97,15 +101,15 @@ def build_echostr(msg):
         update_data_nokiaid(msg['FromUserName'], content)
 
     elif is_name(content):
-        welcome = u"Welcome to sign-up"
+        welcome = u"Sign up name done"
         update_data_name(msg['FromUserName'], content)
 
     else:
         name = update_data_find(msg['FromUserName'])
         if name:
-            welcome = u"%s, please type in keywork to signin" % name
+            welcome = u"%s, please type in keyword to sign" % name
         else:
-            welcome = u"Please sign up with your NokiaID or name(e.g. ZhangYang)"
+            welcome = u"Please sign up with your\n NokiaID(e.g.12345678) and,\nName(e.g. ZhangYang)"
 
     echostr = textTpl % (msg['FromUserName'], msg['ToUserName'], str(int(time())),
             welcome)
@@ -116,60 +120,56 @@ def is_name(str_):
     return str_.isalpha() and str_[0].isupper()
 
 def update_data_find(openid):
-    global DATA
-    for i, data_ in enumerate(DATA):
-        if data_[0] == openid:
-            return DATA[i][4]
-    return
+    index = bisect_left(DATA_INDEX, openid)
+    if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
+        return DATA[index][4]
 
 
 def update_data_sign(openid, meno, timestamp):
-    found = False
     global DATA
-    print('DATA:', DATA)
-    for i, data_ in enumerate(DATA):
-        print('data_: ', data_)
-        if data_[0] == openid:
-            found = True
-            print('found openid for ', meno)
-            DATA[i][1] = meno
-            DATA[i][2] = timestamp
+    global DATA_INDEX
 
-            return DATA[i][4]
-    if not found:
+    index = bisect_left(DATA_INDEX, openid)
+    if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
+        print('found openid for ', meno)
+        DATA[index][1] = meno
+        DATA[index][2] = timestamp
+
+        return DATA[index][4]
+    else:
         new = [openid, meno, '', '', '', '', '']
-        DATA.append(new)
+        DATA.insert(index, new)
+        DATA_INDEX.insert(index, new)
     return
 
 def update_data_name(openid, name):
-    found = False
     global DATA
-    print('DATA:', DATA)
-    for i, data_ in enumerate(DATA):
-        print('data_: ', data_)
-        if data_[0] == openid:
-            found = True
-            print('found openid for ', name)
-            if not data_[4].strip():
-                DATA[i][4] = name
-    if not found:
+    global DATA_INDEX
+
+    index = bisect_left(DATA_INDEX, openid)
+    if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
+        print('found openid for ', name)
+        if not DATA[index][4].strip():
+            DATA[index][4] = name
+    else:
         new = [openid, '', '', '', name, '', ' ']
-        DATA.append(new)
+        DATA.insert(index, new)
+        DATA_INDEX.insert(index, openid)
+        
 
 def update_data_nokiaid(openid, nokiaid):
-    found = False
     global DATA
-    print('DATA:', DATA)
-    for i, data_ in enumerate(DATA):
-        print('data_: ', data_)
-        if data_[0] == openid:
-            found = True
-            print('found openid for ', nokiaid)
-            if not data_[5].strip():
-                DATA[i][5] = nokiaid
-    if not found:
+    global DATA_INDEX
+
+    index = bisect_left(DATA_INDEX, openid)
+    if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
+        print('found openid for ', nokiaid)
+        if not DATA[index][5].strip():
+            DATA[index][5] = nokiaid
+    else:
         new = [openid, '', '', '', '', nokiaid,' ']
-        DATA.append(new)
+        DATA.insert(index, new)
+        DATA_INDEX.insert(index, openid)
 
 '''
     user = {'ID':msg['FromUserName'], 'Memo': msg['Content'], 'Name':msg['name'], 
