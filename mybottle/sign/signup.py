@@ -66,18 +66,6 @@ def main():
     global DATA_INDEX
     DATA = read_data_file()
     DATA_INDEX = [x[0] for x in DATA]
-#    print(bisect_left(index_table, 'oPZW8t7_QdCpwjFK092Bn-iywx6s'))
-    '''
-    msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"61340148"}
-    print(build_echostr(msg))
-    print(DATA)
-    msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"ZhangYang"}
-    print(build_echostr(msg))
-    print(DATA)
-    msg = {"FromUserName":"adfadsfaisdfjalsdifja", "ToUserName":"adfasdfasdf", "Content":"save"}
-    print(build_echostr(msg))
-    print(DATA)
-    '''
 
 def read_data_file():
     filename = './sign_record.xls'
@@ -109,11 +97,12 @@ def build_echostr(msg):
         if name:
             welcome = u"%s, please type in keyword to sign" % name
         else:
-            welcome = u"Please sign up with your\n NokiaID(e.g.12345678) and,\nName(e.g. ZhangYang)"
+            welcome = u"Please sign up with your:\nNokiaID(e.g.12345678),\nName(e.g. ZhangYang)"
 
     echostr = textTpl % (msg['FromUserName'], msg['ToUserName'], str(int(time())),
             welcome)
 
+    print(DATA)
     return echostr
 
 def is_name(str_):
