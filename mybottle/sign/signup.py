@@ -8,6 +8,7 @@ from xls.xls_record import get_records_from_xls, write_to_excel
 mem_dir = '/home/y184zhan/tmp/'
 readable = mem_dir+'xml_file.txt'
 origin = mem_dir+'msg_file.txt'
+KEYWORD = '1python'
 
 def sec2str(secs):
     return strftime("%Y-%m-%d %H:%M:%S", localtime(secs))
@@ -90,32 +91,43 @@ def build_echostr(msg):
         write_to_excel('result.xls', 'SIGN', len(DATA), 7, None, DATA)
 
     elif content.lower() == 'update':
-        welcome = u"Please sign up your ID and Name"
+        welcome = u"Please type in your ID\n(e.g. 10240148)"
         update_data_clear(msg['FromUserName'])
 
-    elif '1python' in content:
-        name = update_data_sign(msg['FromUserName'], content, msg['CreateTime'])
-        welcome = u"Welcome to sign-in: %s" %name
+    elif KEYWORD in content:
+        user = update_data_sign(msg['FromUserName'], content, msg['CreateTime'])
+        if user: # user[4] == name:
+            if user[1]: # meno
+                welcome = u"%s, you have signed!" %user[4]
+            else:
+                welcome = u"Welcome to sign-in: %s" %user[4]
+        else:
+            welcome = u"Please type in Nokia ID:\n(e.g. 10240148)"
 
     elif content.isdigit() and len(content) == 8:
-        welcome = u"Please type in your name:"
+        welcome = u"Please type in your name\n(e.g. ZhangYang):"
         update_data_nokiaid(msg['FromUserName'], content)
 
     elif is_name(content):
-        welcome = u"Sign up name done"
+        welcome = u"Please type in keyword to sign-in"
         update_data_name(msg['FromUserName'], content)
 
     else:
-        name = update_data_find(msg['FromUserName'])
-        if name:
-            welcome = u"%s, please type in keyword to sign" % name
+        user = update_data_find(msg['FromUserName'])
+        if user: # user[4] == name
+            if not user[4]: 
+                welcome = u"Please type in your name\n(e.g. ZhangYang):"
+            elif user[1]: # user[1] == memo
+                welcome = u"%s, you have signed!" % user[4]
+            else:
+                welcome = u"%s, please type in keyword to sign" % user[4]
         else:
-            welcome = u"Please sign up with your:\nNokiaID(e.g.12345678),\nName(e.g. ZhangYang)"
+            welcome = u"Please sign up with your:\nNokiaID (e.g. 12345678)"
 
     echostr = textTpl % (msg['FromUserName'], msg['ToUserName'], str(int(time())),
             welcome)
 
-    print(DATA)
+#    #print(DATA)
     return echostr
 
 def is_name(str_):
@@ -130,7 +142,7 @@ def update_data_clear(openid):
 def update_data_find(openid):
     index = bisect_left(DATA_INDEX, openid)
     if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
-        return DATA[index][4]
+        return DATA[index]
 
 
 def update_data_sign(openid, meno, timestamp):
@@ -139,15 +151,15 @@ def update_data_sign(openid, meno, timestamp):
 
     index = bisect_left(DATA_INDEX, openid)
     if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
-        print('found openid for ', meno)
+#        print('found openid for ', meno)
         DATA[index][1] = meno
         DATA[index][2] = timestamp
 
-        return DATA[index][4]
+        return DATA[index]
     else:
         new = [openid, meno, '', '', '', '', '']
         DATA.insert(index, new)
-        DATA_INDEX.insert(index, new)
+        DATA_INDEX.insert(index, openid)
     return
 
 def update_data_name(openid, name):
@@ -156,7 +168,7 @@ def update_data_name(openid, name):
 
     index = bisect_left(DATA_INDEX, openid)
     if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
-        print('found openid for ', name)
+#        print('found openid for ', name)
         if not DATA[index][4].strip():
             DATA[index][4] = name
     else:
@@ -171,7 +183,7 @@ def update_data_nokiaid(openid, nokiaid):
 
     index = bisect_left(DATA_INDEX, openid)
     if index < len(DATA_INDEX) and DATA_INDEX[index] == openid:
-        print('found openid for ', nokiaid)
+#        print('found openid for ', nokiaid)
         if not DATA[index][5].strip():
             DATA[index][5] = nokiaid
     else:
